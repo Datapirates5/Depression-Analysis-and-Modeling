@@ -1,0 +1,69 @@
+import texthero as hero
+import pandas as pd
+import math
+import numpy as np
+
+import re
+
+
+
+
+from flair.models import TextClassifier
+from flair.data import Sentence
+
+file='df_data_global_v2.csv'
+df=pd.read_csv(file)
+
+
+
+custom_pipeline = [hero.preprocessing.fillna,
+                   hero.preprocessing.lowercase,
+                   hero.preprocessing.remove_whitespace,
+                   hero.preprocessing.remove_urls,
+                   hero.preprocessing.remove_punctuation,
+                   hero.preprocessing.remove_stopwords
+                   ]
+                
+
+df['text_clean'] = df['text'].pipe(hero.clean, custom_pipeline)
+
+
+
+df.text_clean = df.text_clean.apply(lambda x: re.sub(r"[^a-z\s\(\-:\)\\\/\];='#]", '', x))
+
+df['text_clean'] = df['text_clean'].pipe(hero.clean, custom_pipeline)
+
+
+
+df.to_csv('df_global_0422.csv')
+
+from flair.models import TextClassifier
+from flair.data import Sentence
+
+sia = TextClassifier.load('en-sentiment')
+def flair_prediction(x):
+    sentence = Sentence(x)
+    sia.predict(sentence)
+    score = sentence.labels[0]
+    if "POSITIVE" in str(score):
+        return "pos"
+    elif "NEGATIVE" in str(score):
+        return "neg"
+    else:
+        return "neu"
+df["sentiment"] = df["text_clean"].apply(flair_prediction)
+
+
+
+df = df[df['text_clean'].notna()]
+df= df.drop(columns=['verified'])
+df= df.drop(columns=['extracted_location'])
+
+df['description'] = hero.clean(df['description'])
+
+
+#df.rename(columns={'text_v2': 'text_clean'}, inplace=True)
+
+df['sentiment_1'] = np.where(df['sentiment']== 'neg', 0, 1)
+
+df.to_csv('df_global_0422_final.csv')
